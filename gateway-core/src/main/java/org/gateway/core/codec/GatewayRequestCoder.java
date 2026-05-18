@@ -20,37 +20,56 @@ public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpReq
     protected void channelRead0(io.netty.channel.ChannelHandlerContext ctx, FullHttpRequest msg) throws Exception {
         log.info("GatewayRequestCoder解码……");
         GatewayRequest request = new GatewayRequest();
-
+        // 请求方法
         request.setMethod(HttpMethodEnum.valueOf(msg.method().name()));
         
-        String[] host = msg.headers().get(HttpHeaderNames.HOST).split(":");
-        request.setPort(Integer.parseInt(host[1]));
-        request.setHost(host[0]);
+        // 获取Host和Port
+        String hostHeader = msg.headers().get(HttpHeaderNames.HOST);
+        String host;
+        int port;
+        if (hostHeader.contains(":")) {
+            String[] parts = hostHeader.split(":");
+            host = parts[0];
+            port = Integer.parseInt(parts[1]);
+        } else {
+            host = hostHeader;
+            port = ctx.pipeline().get(SslHandler.class) != null ? 443 : 80;
+        }
+        request.setPort(port);
+        request.setHost(host);
 
-        request.setPath(msg.uri());
 
-        request.setUrl(
-            (ctx.pipeline().get(SslHandler.class) != null ? "https://" : "http://") +
-             request.getHost() + 
-             request.getPath()
-        );
-        
-        // 请求参数解析
-        String uri = request.getPath();
-        int qIdx = uri.indexOf('?');
-        Map<String, String> paramMap = new HashMap<>();
+        String originUri = msg.uri();
+        int qIdx = originUri.indexOf('?');
         if (qIdx > 0) {
-            String queryStr = uri.substring(qIdx + 1);
-            String[] kvArr = queryStr.split("&");
+            // 请求路径
+            request.setPath(originUri.substring(0, qIdx));
+
+            // 请求参数解析
+            String params = originUri.substring(qIdx + 1);
+            var queryParams = new HashMap<String, String>();
+            String[] kvArr = params.split("&");
             for (String kv : kvArr) {
                 int eqIdx = kv.indexOf('=');
                 if (eqIdx > 0) {
-                    paramMap.put(kv.substring(0, eqIdx), kv.substring(eqIdx + 1));
+                    queryParams.put(kv.substring(0, eqIdx), kv.substring(eqIdx + 1));
                 }
             }
+            request.setQueryParams(queryParams);
+        } else {
+            request.setPath(originUri);
         }
-        request.setQueryParams(paramMap);
 
+        // 完整URL构建
+        request.setUrl(
+            (ctx.pipeline().get(SslHandler.class) != null ? "https://" : "http://") +
+             request.getHost() + ":" + 
+             request.getPort() +
+             request.getPath()
+        );
+        
+
+        // 请求头解析
         var header = new HashMap<String, String>();
         for (Map.Entry<String, String> entry : msg.headers()) {
             String headKey = entry.getKey();
@@ -59,6 +78,8 @@ public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpReq
         }
         request.setHeaders(header);
 
+
+        // 请求体解析
         ByteBuf content = msg.content();
         if (content.isReadable()) {
             byte[] body = new byte[content.readableBytes()];
@@ -66,10 +87,13 @@ public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpReq
             request.setBody(body);
         }
 
+        // 请求来源
         request.setRemoteAddress(ctx.channel().remoteAddress().toString());
 
+        // 请求时间戳
         request.setTimestamp(System.currentTimeMillis());
 
+        // 请求ID生成
         request.setRequestId("request-" + UUID.randomUUID().toString());
 
         log.info("解码完成……");

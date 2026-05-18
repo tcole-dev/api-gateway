@@ -1,7 +1,6 @@
 package org.gateway.common.model;
 
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -60,6 +59,9 @@ public class GatewayRequest {
      */
     @SuppressWarnings("unchecked")
     public <T> T getAttribute(String key) {
+        if (attributes == null) {
+            return null;
+        }
         return (T) attributes.get(key);
     }
 }
