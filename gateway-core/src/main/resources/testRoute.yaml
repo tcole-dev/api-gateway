@@ -1,0 +1,35 @@
+routes:
+  - enabled: true
+    routeId: user-service
+    path: /api/user/**
+    order: 10
+    limit: 100
+    circuitBreakerLimit: 50
+    serviceInstances:
+      - instanceId: user-1
+        serviceId: user-service
+        host: 127.0.0.1
+        port: 8081
+        weight: 100
+        healthy: true
+        
+      - instanceId: user-2
+        serviceId: user-service
+        host: 127.0.0.1
+        port: 8082
+        weight: 80
+        healthy: true
+
+  - enabled: true
+    routeId: order-service
+    path: /api/order/**
+    order: 20
+    limit: 80
+    circuitBreakerLimit: 60
+    serviceInstances:
+      - instanceId: order-1
+        serviceId: order-service
+        host: 127.0.0.1
+        port: 9001
+        weight: 100
+        healthy: true
