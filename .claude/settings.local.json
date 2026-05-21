@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(mvn clean *)",
-      "Bash(mvn dependency:build-classpath -pl gateway-core -q -DincludeScope=runtime -Dmdep.outputFile=/tmp/cp.txt)",
-      "Read(//tmp/**)"
-    ]
-  }
-}

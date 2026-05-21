@@ -1,0 +1,5 @@
+nettyPort: 8080
+redisAddress: "localhost"
+redisPort: 6379
+requestBodyMaxSize: 10240
+localRoute: "testRoute.yaml"
