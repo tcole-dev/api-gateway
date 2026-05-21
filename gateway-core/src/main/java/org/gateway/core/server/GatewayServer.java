@@ -1,10 +1,12 @@
 package org.gateway.core.server;
 
 
+import org.gateway.core.Bean.BeanContainer;
+import org.gateway.core.config.GatewayConfig;
+
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
-// import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import lombok.extern.slf4j.Slf4j;
 
@@ -65,6 +67,7 @@ public class GatewayServer {
     }
 
     public static void main(String[] args) {
-        new GatewayServer(8080).run();
+        BeanContainer.init();
+        new GatewayServer(BeanContainer.getBean(GatewayConfig.class).getNettyPort()).run();
     }
 }

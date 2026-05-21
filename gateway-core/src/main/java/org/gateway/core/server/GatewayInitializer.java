@@ -1,6 +1,8 @@
 package org.gateway.core.server;
 
+import org.gateway.core.Bean.BeanContainer;
 import org.gateway.core.codec.GatewayRequestCoder;
+import org.gateway.core.config.GatewayConfig;
 import org.gateway.core.handler.NettyHttpServerHandler;
 
 import io.netty.channel.ChannelInitializer;
@@ -14,7 +16,7 @@ public  class GatewayInitializer extends ChannelInitializer<SocketChannel> {
         // http请求解析（入站处理器）
         socketChannel.pipeline().addLast("http-coder", new HttpServerCodec());
         // 将解析的请求片封装粘合（入站处理器）
-        socketChannel.pipeline().addLast("http-aggregator" ,new HttpObjectAggregator(10 * 1024 * 1024));
+        socketChannel.pipeline().addLast("http-aggregator" ,new HttpObjectAggregator(BeanContainer.getBean(GatewayConfig.class).getRequestBodyMaxSize()));
         // 自定义请求对象编码器（入站处理器）
         socketChannel.pipeline().addLast("gateway-request-coder", new GatewayRequestCoder());
         // 自定义处理（产生响应对象）
