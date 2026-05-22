@@ -14,6 +14,8 @@ public class ServiceInstance {
     private int port;
     // 权重，数值越大优先被选中
     private int weight;
+    // 当前权重，负载均衡算法使用
+    private int currentWeight = 0;
     // 健康状态，true表示健康，false表示不健康
     private boolean healthy;
 }
