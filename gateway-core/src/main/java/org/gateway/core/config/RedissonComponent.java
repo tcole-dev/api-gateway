@@ -35,7 +35,7 @@ public class RedissonComponent implements Component {
             Config config = new Config();
             
             // 从配置文件读取
-            config.useSingleServer().setAddress(gatewayConfig.getRedisAddress() + ":" + gatewayConfig.getRedisPort());
+            config.useSingleServer().setAddress("redis://" + gatewayConfig.getRedisAddress() + ":" + gatewayConfig.getRedisPort());
             if (gatewayConfig.getRedisPassword() != null) {
                 config.useSingleServer().setPassword(gatewayConfig.getRedisPassword());
             }
