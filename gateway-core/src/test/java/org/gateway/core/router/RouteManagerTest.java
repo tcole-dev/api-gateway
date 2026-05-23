@@ -2,8 +2,10 @@ package org.gateway.core.router;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.gateway.common.enums.LoadBalanceStrategy;
 import org.gateway.common.model.RouteDefinition;
 import org.gateway.core.Bean.BeanContainer;
+import org.gateway.core.balance.BalanceLoader;
 import org.gateway.core.config.GatewayConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,7 @@ class RouteManagerTest {
         config.setLocalRoute("testRoute.yaml");
         BeanContainer.clear();
         BeanContainer.registerBean(config);
+        BeanContainer.registerBean(new BalanceLoader(LoadBalanceStrategy.ROUND_ROBIN));
         routeManager = new RouteManager(null);
     }
 

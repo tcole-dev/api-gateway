@@ -12,13 +12,15 @@ routes:
         port: 8081
         weight: 100
         healthy: true
-        
+        scheme: http
+
       - instanceId: user-2
         serviceId: user-service
         host: 127.0.0.1
         port: 8082
         weight: 80
         healthy: true
+        scheme: http
 
   - enabled: true
     routeId: order-service
@@ -33,3 +35,4 @@ routes:
         port: 9001
         weight: 100
         healthy: true
+        scheme: http

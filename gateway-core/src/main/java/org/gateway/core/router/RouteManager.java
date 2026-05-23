@@ -11,6 +11,7 @@ import org.gateway.common.model.RouteDefinition;
 import org.gateway.common.utils.YamlUtil;
 import org.gateway.core.Bean.BeanContainer;
 import org.gateway.core.Bean.Component;
+import org.gateway.core.balance.BalanceLoader;
 import org.gateway.core.config.GatewayConfig;
 import org.gateway.core.config.RedissonComponent;
 import org.redisson.api.RMap;
@@ -131,6 +132,7 @@ public class RouteManager implements Component {
             }
 
             this.compiledRoutes = routeSort(this.routeMap);
+            BeanContainer.getBean(BalanceLoader.class).resetWeightState();
             log.info("路由表已从Redis更新，当前路由数量：{}", this.compiledRoutes.size());
         }
     }
@@ -143,6 +145,7 @@ public class RouteManager implements Component {
         this.routeMap.clear();
         this.routeMap.putAll(testRoutes);
         this.compiledRoutes = routeSort(this.routeMap);
+        BeanContainer.getBean(BalanceLoader.class).resetWeightState();
 
         log.info("本地路由已加载，当前路由数量：{}", this.compiledRoutes.size());
     }
