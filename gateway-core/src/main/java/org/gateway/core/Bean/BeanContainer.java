@@ -1,6 +1,8 @@
 package org.gateway.core.Bean;
 
+import org.gateway.common.enums.LoadBalanceStrategy;
 import org.gateway.common.utils.YamlUtil;
+import org.gateway.core.balance.BalanceLoader;
 import org.gateway.core.config.GatewayConfig;
 import org.gateway.core.config.RedissonComponent;
 import org.gateway.core.router.RouteManager;
@@ -59,11 +61,15 @@ public class BeanContainer {
         GatewayConfig gatewayConfig = YamlUtil.loadAs("GatewayConfig.yaml", GatewayConfig.class);
         beanMap.put(GatewayConfig.class, gatewayConfig);
 
-        // 2. 注册 Redisson
+        // 2. 负载均衡器
+        BalanceLoader balanceLoader = new BalanceLoader(LoadBalanceStrategy.WEIGHT_ROUND_ROBIN);
+        beanMap.put(BalanceLoader.class, balanceLoader);
+
+        // 3. 注册 Redisson
         RedissonComponent redissonComponent = new RedissonComponent(gatewayConfig);
         beanMap.put(RedissonComponent.class, redissonComponent);
 
-        // 3. 注册 RouteManager（依赖 Redisson）
+        // 4. 注册 RouteManager（依赖 Redisson）
         RouteManager routeManager = new RouteManager(redissonComponent);
         beanMap.put(RouteManager.class, routeManager);
     }

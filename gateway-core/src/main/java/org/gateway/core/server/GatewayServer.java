@@ -2,6 +2,7 @@ package org.gateway.core.server;
 
 
 import org.gateway.core.Bean.BeanContainer;
+import org.gateway.core.Bean.HttpClient;
 import org.gateway.core.config.GatewayConfig;
 
 import io.netty.bootstrap.ServerBootstrap;
@@ -28,6 +29,8 @@ public class GatewayServer {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
 
         try {
+            HttpClient.register(workerGroup); // 依赖注入 HttpClient
+
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.group(bossGroup, workerGroup)
                     // Channel类型
@@ -43,7 +46,7 @@ public class GatewayServer {
             log.info("==============================================");
             log.info("网关开启在端口： {}", port);
             log.info("==============================================");
-            
+
             // 阻塞监听，直到关闭
             future.channel().closeFuture().sync();
 
@@ -57,6 +60,8 @@ public class GatewayServer {
             log.info("==============================================");
             // 优雅关闭
             try {
+                HttpClient.closeClient(); // 优雅关闭 HttpClient
+
                 bossGroup.shutdownGracefully().sync();
                 workerGroup.shutdownGracefully().sync();
             } catch (InterruptedException e) {
