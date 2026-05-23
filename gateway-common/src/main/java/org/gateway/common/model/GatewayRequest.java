@@ -17,12 +17,6 @@ public class GatewayRequest {
     private String requestId;
     // 请求方法
     private HttpMethodEnum method;
-    // 主机
-    private String host;
-    // 端口
-    private int port;
-    // 请求URL
-    private String url;
     // 请求路径
     private String path;
     // 请求参数
