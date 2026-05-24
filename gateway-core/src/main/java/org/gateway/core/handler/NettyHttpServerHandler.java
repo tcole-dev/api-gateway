@@ -48,7 +48,9 @@ public class NettyHttpServerHandler extends SimpleChannelInboundHandler<GatewayR
             return;
         }
 
+        // 负载均衡选择实例
         ServiceInstance instance = balanceLoader.select(route.getServiceInstances());
+
         // 实例选择失败，返回503响应
         if (instance == null) {
             log.warn("未找到匹配的服务实例：{}", route.getRouteId());
@@ -61,10 +63,30 @@ public class NettyHttpServerHandler extends SimpleChannelInboundHandler<GatewayR
         // 添加代理头
         String realClientIp = msg.getRemoteAddress();
         msg.getHeaders().put("X-Forwarded-For", realClientIp);
+        msg.getHeaders().put("X-Real-Ip", realClientIp);
 
+        // 构建目标 URL
+        String toUrl = buildTargetUrl(instance, msg);
+        log.info("转发请求到：{}", toUrl);
 
-        String toUrl = instance.getScheme() + "://" + instance.getHost() + ":" + instance.getPort() + msg.getPath();
-        var params = msg.getQueryParams();
+        // 转发请求并回写响应
+        GatewayResponse gatewayResponse = client.forwardRequest(msg, toUrl);
+        ctx.writeAndFlush(gatewayResponse);
+    }
+
+    /**
+     * 构建目标 URL
+     */
+    private String buildTargetUrl(ServiceInstance instance, GatewayRequest request) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(instance.getScheme())
+          .append("://")
+          .append(instance.getHost())
+          .append(":")
+          .append(instance.getPort())
+          .append(request.getPath());
+
+        var params = request.getQueryParams();
         if (params != null && !params.isEmpty()) {
             StringJoiner queryJoiner = new StringJoiner("&");
             for (Map.Entry<String, String> entry : params.entrySet()) {
@@ -72,48 +94,9 @@ public class NettyHttpServerHandler extends SimpleChannelInboundHandler<GatewayR
                 String value = URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8);
                 queryJoiner.add(key + "=" + value);
             }
-            toUrl += "?" + queryJoiner;
-        }
-        log.info("转发请求到：{}", toUrl);
-
-        GatewayResponse gatewayResponse = client.forwardRequest(msg, toUrl);
-        ctx.writeAndFlush(gatewayResponse);
-    }
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("处理请求时发生错误: {}", cause.getMessage(), cause);
-
-        int status;
-        String message;
-
-        if (cause instanceof java.util.concurrent.ExecutionException) {
-            Throwable targetException = cause.getCause();
-            if (targetException instanceof java.util.concurrent.TimeoutException) {
-                status = HttpResponseStatus.GATEWAY_TIMEOUT.code();
-                message = "Gateway Timeout: The backend service did not respond in time.";
-            } else {
-                status = HttpResponseStatus.BAD_GATEWAY.code();
-                message = "Bad Gateway: The backend service returned an invalid response or was unreachable.";
-            }
-        } else if (cause instanceof InterruptedException) {
-            status = HttpResponseStatus.SERVICE_UNAVAILABLE.code();
-            message = "Service Unavailable: The request was interrupted.";
-        } else {
-            status = HttpResponseStatus.INTERNAL_SERVER_ERROR.code();
-            message = "Internal Server Error: An unexpected error occurred.";
+            sb.append("?").append(queryJoiner);
         }
 
-        if (ctx.channel().isActive()) {
-            ctx.writeAndFlush(GatewayResponseWriter.errorResponse(
-                    HttpResponseStatus.valueOf(status), message)).addListener(future -> {
-                if (!future.isSuccess()) {
-                    log.error("Failed to send error response", future.cause());
-                }
-                ctx.close();
-            });
-        } else {
-            ctx.close();
-        }
+        return sb.toString();
     }
 }

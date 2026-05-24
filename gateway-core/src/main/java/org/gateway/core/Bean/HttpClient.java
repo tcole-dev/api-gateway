@@ -27,11 +27,12 @@ public class HttpClient implements Component {
         // 构建可复用的配置
         AsyncHttpClientConfig config = new DefaultAsyncHttpClientConfig.Builder()
             .setEventLoopGroup(group) // 核心：复用线程池
-            .setConnectTimeout(5000)
-            .setReadTimeout(50000)
-            .setMaxConnections(500)         // 根据业务调整连接池大小
+            .setConnectTimeout(5000)      // 连接超时 5s
+            .setReadTimeout(30000)        // 读超时 30s，与 ReadTimeoutHandler 对齐
+            .setMaxConnections(500)
             .setMaxConnectionsPerHost(100)
             .setKeepAlive(true)
+            .setPooledConnectionIdleTimeout(60000) // 空闲连接 60s 回收
             .build();
         this.client = new DefaultAsyncHttpClient(config);
 
