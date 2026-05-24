@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.gateway.common.enums.HttpMethodEnum;
 import org.gateway.common.model.GatewayRequest;
+import org.gateway.core.config.TrustedProxyResolver;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -14,6 +15,13 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpRequest> {
+
+    private final TrustedProxyResolver proxyResolver;
+
+    public GatewayRequestCoder(TrustedProxyResolver proxyResolver) {
+        this.proxyResolver = proxyResolver;
+    }
+
     @Override
     protected void channelRead0(io.netty.channel.ChannelHandlerContext ctx, FullHttpRequest msg) throws Exception {
         GatewayRequest request = new GatewayRequest();
@@ -31,7 +39,8 @@ public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpReq
             for (String kv : params.split("&")) {
                 int eqIdx = kv.indexOf('=');
                 if (eqIdx > 0) {
-                    queryParams.put(kv.substring(0, eqIdx), kv.substring(eqIdx + 1));
+                    queryParams.merge(kv.substring(0, eqIdx), kv.substring(eqIdx + 1),
+                        (old, val) -> old + ", " + val);
                 }
             }
             request.setQueryParams(queryParams);
@@ -42,7 +51,8 @@ public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpReq
         // 请求头解析
         var header = new HashMap<String, String>();
         for (Map.Entry<String, String> entry : msg.headers()) {
-            header.put(entry.getKey(), entry.getValue());
+            header.merge(entry.getKey(), entry.getValue(),
+                (old, val) -> old + ", " + val);
         }
         request.setHeaders(header);
 
@@ -50,14 +60,16 @@ public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpReq
         ByteBuf content = msg.content();
         if (content.isReadable()) {
             byte[] body = new byte[content.readableBytes()];
-            // int readerIndex = content.readerIndex();
             content.readBytes(body);
-            // content.readerIndex(readerIndex);
             request.setBody(body);
         }
 
-        // 请求来源
-        request.setRemoteAddress(ctx.channel().remoteAddress().toString());
+        // 解析真实客户端IP
+        String tcpRemote = ctx.channel().remoteAddress().toString();
+        String xff = header.get("X-Forwarded-For");
+        String realIp = proxyResolver.resolve(tcpRemote, xff);
+        request.setRemoteAddress(realIp);
+
         // 请求时间戳
         request.setTimestamp(System.currentTimeMillis());
         // 请求ID

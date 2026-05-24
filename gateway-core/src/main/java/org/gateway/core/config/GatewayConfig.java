@@ -1,5 +1,7 @@
 package org.gateway.core.config;
 
+import java.util.List;
+
 import org.gateway.core.Bean.Component;
 
 import lombok.Data;
@@ -18,4 +20,6 @@ public class GatewayConfig implements Component {
     private int requestBodyMaxSize;
 
     private String localRoute;
+
+    private List<String> trustedProxies;
 }

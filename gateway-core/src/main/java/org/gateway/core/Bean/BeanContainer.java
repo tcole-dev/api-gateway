@@ -5,6 +5,7 @@ import org.gateway.common.utils.YamlUtil;
 import org.gateway.core.balance.BalanceLoader;
 import org.gateway.core.config.GatewayConfig;
 import org.gateway.core.config.RedissonComponent;
+import org.gateway.core.config.TrustedProxyResolver;
 import org.gateway.core.router.RouteManager;
 import java.util.HashMap;
 import java.util.Map;
@@ -65,7 +66,11 @@ public class BeanContainer {
         BalanceLoader balanceLoader = new BalanceLoader(LoadBalanceStrategy.WEIGHT_ROUND_ROBIN);
         beanMap.put(BalanceLoader.class, balanceLoader);
 
-        // 3. 注册 Redisson
+        // 3. 可信代理解析器
+        TrustedProxyResolver trustedProxyResolver = new TrustedProxyResolver(gatewayConfig.getTrustedProxies());
+        beanMap.put(TrustedProxyResolver.class, trustedProxyResolver);
+
+        // 4. 注册 Redisson
         RedissonComponent redissonComponent = new RedissonComponent(gatewayConfig);
         beanMap.put(RedissonComponent.class, redissonComponent);
 
