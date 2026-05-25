@@ -5,6 +5,8 @@ import org.gateway.common.enums.LoadBalanceStrategy;
 import org.gateway.common.utils.YamlUtil;
 import org.gateway.core.balance.BalanceLoader;
 import org.gateway.core.client.RedissonComponent;
+import org.gateway.core.filter.FilterChain;
+import org.gateway.core.proxy.ProxyService;
 import org.gateway.core.proxy.TrustedProxyResolver;
 import org.gateway.core.router.RouteManager;
 import java.util.HashMap;
@@ -77,6 +79,14 @@ public class BeanContainer {
         // 5. 注册 RouteManager（依赖 Redisson）
         RouteManager routeManager = new RouteManager(redissonComponent);
         beanMap.put(RouteManager.class, routeManager);
+
+        // 6. 注册 ProxyService（HttpClient 已在 BeanContainer.init() 之前由 main 注册）
+        ProxyService proxyService = new ProxyService();
+        beanMap.put(ProxyService.class, proxyService);
+
+        // 7. 注册 FilterChain
+        FilterChain filterChain = new FilterChain(proxyService);
+        beanMap.put(FilterChain.class, filterChain);
     }
 
     // ========== 对外初始化入口 ==========

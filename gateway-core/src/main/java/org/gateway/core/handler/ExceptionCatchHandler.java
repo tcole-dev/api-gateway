@@ -1,10 +1,9 @@
 package org.gateway.core.handler;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 import org.gateway.common.exception.GatewayBusinessException;
 import org.gateway.common.model.GatewayResponse;
+import org.gateway.core.codec.GatewayResponseWriter;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -65,15 +64,10 @@ public class ExceptionCatchHandler extends ChannelInboundHandlerAdapter {
         }
 
         if (ctx.channel().isActive()) {
-            byte[] bodyBytes = message.getBytes(StandardCharsets.UTF_8);
-            GatewayResponse errorResp = GatewayResponse.builder()
-                    .status(status.code())
-                    .body(bodyBytes)
-                    .headers(Map.of(
-                            "Content-Type", "text/plain; charset=utf-8",
-                            "Content-Length", String.valueOf(bodyBytes.length)))
-                    .build();
-            ctx.writeAndFlush(errorResp).addListener(future -> {
+            // 使用 GatewayResponseWriter 的静态方法构建响应
+            GatewayResponse errorResp = GatewayResponseWriter.errorResponse(status, message);
+            // 使用 channel().writeAndFlush 确保经过 GatewayResponseWriter 出站处理器
+            ctx.channel().writeAndFlush(errorResp).addListener(future -> {
                 if (!future.isSuccess()) {
                     log.error("Failed to send error response", future.cause());
                 }

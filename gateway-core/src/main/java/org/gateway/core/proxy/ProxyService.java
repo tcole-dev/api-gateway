@@ -1,0 +1,105 @@
+package org.gateway.core.proxy;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.StringJoiner;
+
+import org.gateway.common.model.GatewayRequest;
+import org.gateway.common.model.GatewayResponse;
+import org.gateway.common.model.RouteDefinition;
+import org.gateway.common.model.ServiceInstance;
+import org.gateway.core.bean.BeanContainer;
+import org.gateway.core.bean.Component;
+import org.gateway.core.balance.BalanceLoader;
+import org.gateway.core.client.HttpClient;
+import org.gateway.core.router.RouteManager;
+
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * 代理服务
+ * 封装完整的代理转发流程：路由匹配 → 负载均衡 → 请求转发
+ */
+@Slf4j
+public class ProxyService implements Component {
+
+    private final RouteManager routeManager;
+    private final BalanceLoader balanceLoader;
+    private final HttpClient httpClient;
+
+    public ProxyService() {
+        this.routeManager = BeanContainer.getBean(RouteManager.class);
+        this.balanceLoader = BeanContainer.getBean(BalanceLoader.class);
+        this.httpClient = BeanContainer.getBean(HttpClient.class);
+    }
+
+    /**
+     * 执行代理转发（完整流程）
+     * 路由匹配 → 负载均衡 → 记录上下文 → 转发请求
+     *
+     * @param request 请求
+     * @return 后端响应
+     * @throws RuntimeException 路由匹配失败、无可用实例、转发异常
+     */
+    public GatewayResponse execute(GatewayRequest request) {
+        // 1. 路由匹配
+        RouteDefinition route = routeManager.matchRoute(request.getPath());
+        if (route == null) {
+            throw new RuntimeException("No route found for path: " + request.getPath());
+        }
+
+        // 2. 负载均衡选择实例
+        ServiceInstance instance = balanceLoader.select(route.getServiceInstances());
+        if (instance == null) {
+            throw new RuntimeException("No available service instance for route: " + route.getRouteId());
+        }
+
+        // 3. 记录路由信息到请求上下文（供日志过滤器使用）
+        request.setAttribute("routeId", route.getRouteId());
+        request.setAttribute("instance", instance.getHost() + ":" + instance.getPort());
+        String forward = instance.getScheme() + "://" + instance.getHost() + ":" + instance.getPort() + request.getPath();
+        request.setAttribute("forward", forward);
+
+        // 4. 添加代理头
+        String realClientIp = request.getRemoteAddress();
+        request.getHeaders().put("X-Forwarded-For", realClientIp);
+        request.getHeaders().put("X-Real-Ip", realClientIp);
+
+        // 5. 构建目标 URL 并转发
+        String toUrl = buildTargetUrl(instance, request);
+        log.info("转发请求到：{}", toUrl);
+
+        try {
+            return httpClient.forwardRequest(request, toUrl);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to forward request: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 构建目标 URL
+     */
+    private String buildTargetUrl(ServiceInstance instance, GatewayRequest request) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(instance.getScheme())
+          .append("://")
+          .append(instance.getHost())
+          .append(":")
+          .append(instance.getPort())
+          .append(request.getPath());
+
+        var params = request.getQueryParams();
+        if (params != null && !params.isEmpty()) {
+            StringJoiner queryJoiner = new StringJoiner("&");
+            for (Map.Entry<String, String> entry : params.entrySet()) {
+                String key = URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8);
+                String value = URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8);
+                queryJoiner.add(key + "=" + value);
+            }
+            sb.append("?").append(queryJoiner);
+        }
+
+        return sb.toString();
+    }
+}

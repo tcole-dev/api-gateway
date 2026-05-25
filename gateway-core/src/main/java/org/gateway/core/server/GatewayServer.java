@@ -15,22 +15,17 @@ import lombok.extern.slf4j.Slf4j;
 public class GatewayServer {
 
     private final int port;
+    private final EventLoopGroup workerGroup;
 
-    public GatewayServer(int port) {
+    public GatewayServer(int port, EventLoopGroup workerGroup) {
         this.port = port;
+        this.workerGroup = workerGroup;
     }
 
     public void run () {
-        // Netty 4.2.5.Final 写法
-        // EventLoopGroup bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
-        // EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
-
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
 
         try {
-            HttpClient.register(workerGroup); // 依赖注入 HttpClient
-
             ServerBootstrap bootstrap = new ServerBootstrap();
             bootstrap.group(bossGroup, workerGroup)
                     // Channel类型
@@ -72,7 +67,11 @@ public class GatewayServer {
     }
 
     public static void main(String[] args) {
+        // 先创建 workerGroup 并注册 HttpClient（ProxyService 构造时依赖）
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        HttpClient.register(workerGroup);
+
         BeanContainer.init();
-        new GatewayServer(BeanContainer.getBean(GatewayConfig.class).getNettyPort()).run();
+        new GatewayServer(BeanContainer.getBean(GatewayConfig.class).getNettyPort(), workerGroup).run();
     }
 }
