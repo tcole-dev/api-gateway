@@ -1,6 +1,7 @@
-package org.gateway.core.config;
+package org.gateway.core.client;
 
-import org.gateway.core.Bean.Component;
+import org.gateway.common.config.GatewayConfig;
+import org.gateway.core.bean.Component;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
@@ -33,7 +34,7 @@ public class RedissonComponent implements Component {
     private RedissonClient initRedisson(GatewayConfig gatewayConfig) {
         try {
             Config config = new Config();
-            
+
             // 从配置文件读取
             config.useSingleServer().setAddress("redis://" + gatewayConfig.getRedisAddress() + ":" + gatewayConfig.getRedisPort());
             if (gatewayConfig.getRedisPassword() != null) {

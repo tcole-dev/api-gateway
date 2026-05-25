@@ -1,10 +1,10 @@
-package org.gateway.core.config;
+package org.gateway.core.proxy;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.List;
 
-import org.gateway.core.Bean.Component;
+import org.gateway.core.bean.Component;
 
 import lombok.extern.slf4j.Slf4j;
 

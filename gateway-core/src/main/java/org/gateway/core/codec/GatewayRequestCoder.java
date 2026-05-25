@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.gateway.common.enums.HttpMethodEnum;
 import org.gateway.common.model.GatewayRequest;
-import org.gateway.core.config.TrustedProxyResolver;
+import org.gateway.core.proxy.TrustedProxyResolver;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.SimpleChannelInboundHandler;

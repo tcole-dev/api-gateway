@@ -1,11 +1,11 @@
-package org.gateway.core.Bean;
+package org.gateway.core.bean;
 
+import org.gateway.common.config.GatewayConfig;
 import org.gateway.common.enums.LoadBalanceStrategy;
 import org.gateway.common.utils.YamlUtil;
 import org.gateway.core.balance.BalanceLoader;
-import org.gateway.core.config.GatewayConfig;
-import org.gateway.core.config.RedissonComponent;
-import org.gateway.core.config.TrustedProxyResolver;
+import org.gateway.core.client.RedissonComponent;
+import org.gateway.core.proxy.TrustedProxyResolver;
 import org.gateway.core.router.RouteManager;
 import java.util.HashMap;
 import java.util.Map;
@@ -74,7 +74,7 @@ public class BeanContainer {
         RedissonComponent redissonComponent = new RedissonComponent(gatewayConfig);
         beanMap.put(RedissonComponent.class, redissonComponent);
 
-        // 4. 注册 RouteManager（依赖 Redisson）
+        // 5. 注册 RouteManager（依赖 Redisson）
         RouteManager routeManager = new RouteManager(redissonComponent);
         beanMap.put(RouteManager.class, routeManager);
     }

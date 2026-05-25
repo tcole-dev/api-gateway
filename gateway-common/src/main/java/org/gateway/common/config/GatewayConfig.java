@@ -1,13 +1,11 @@
-package org.gateway.core.config;
+package org.gateway.common.config;
 
 import java.util.List;
-
-import org.gateway.core.Bean.Component;
 
 import lombok.Data;
 
 @Data
-public class GatewayConfig implements Component {
+public class GatewayConfig {
 
     private int nettyPort;
 

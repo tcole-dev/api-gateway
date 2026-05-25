@@ -14,9 +14,9 @@ import org.gateway.common.model.GatewayRequest;
 import org.gateway.common.model.GatewayResponse;
 import org.gateway.common.model.RouteDefinition;
 import org.gateway.common.model.ServiceInstance;
-import org.gateway.core.Bean.BeanContainer;
-import org.gateway.core.Bean.HttpClient;
+import org.gateway.core.bean.BeanContainer;
 import org.gateway.core.balance.BalanceLoader;
+import org.gateway.core.client.HttpClient;
 import org.gateway.core.codec.GatewayResponseWriter;
 import org.gateway.core.router.RouteManager;
 

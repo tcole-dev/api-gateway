@@ -3,6 +3,7 @@ package org.gateway.core.handler;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import org.gateway.common.exception.GatewayBusinessException;
 import org.gateway.common.model.GatewayResponse;
 
 import io.netty.channel.ChannelHandlerContext;
@@ -11,38 +12,56 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 统一异常处理器：捕获所有上游 Handler 泄漏的异常
- * 位于 Pipeline 末端，确保任何未捕获异常都能返回有意义的响应
+ * Pipeline 框架级异常处理器
+ * 只处理 Netty 框架层面的异常（编解码、超时、连接等）
+ * 业务异常（GatewayBusinessException）由 FilterChain 中的 ErrorFilter 处理
  */
 @Slf4j
 public class ExceptionCatchHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("Pipeline 异常: {}", cause.getMessage(), cause);
+        // 业务异常交给 ErrorFilter 处理，不在这里处理
+        if (cause instanceof GatewayBusinessException) {
+            super.exceptionCaught(ctx, cause);
+            return;
+        }
+
+        // 只处理 Pipeline 框架异常
+        log.error("Pipeline 框架异常: {}", cause.getMessage(), cause);
 
         HttpResponseStatus status;
         String message;
 
-        if (cause instanceof java.util.concurrent.ExecutionException execEx) {
-            Throwable target = execEx.getCause();
-            if (target instanceof java.util.concurrent.TimeoutException) {
-                status = HttpResponseStatus.GATEWAY_TIMEOUT;
-                message = "Gateway Timeout: The backend service did not respond in time.";
-            } else {
-                status = HttpResponseStatus.BAD_GATEWAY;
-                message = "Bad Gateway: The backend service returned an invalid response or was unreachable.";
-            }
-        } else if (cause instanceof InterruptedException) {
-            status = HttpResponseStatus.SERVICE_UNAVAILABLE;
-            message = "Service Unavailable: The request was interrupted.";
-            Thread.currentThread().interrupt();
-        } else if (cause instanceof IllegalArgumentException) {
+        // HTTP 解码异常：请求体过大
+        if (cause instanceof io.netty.handler.codec.TooLongFrameException) {
+            status = HttpResponseStatus.REQUEST_ENTITY_TOO_LARGE;
+            message = "Request Entity Too Large: The request exceeds the maximum allowed size.";
+        }
+        // HTTP 解码异常：格式错误
+        else if (cause instanceof io.netty.handler.codec.DecoderException) {
             status = HttpResponseStatus.BAD_REQUEST;
-            message = "Bad Request: " + cause.getMessage();
-        } else {
+            message = "Bad Request: Failed to decode the HTTP request.";
+        }
+        // 读超时
+        else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+            status = HttpResponseStatus.REQUEST_TIMEOUT;
+            message = "Request Timeout: The client did not send the request in time.";
+        }
+        // 写超时
+        else if (cause instanceof io.netty.handler.timeout.WriteTimeoutException) {
             status = HttpResponseStatus.INTERNAL_SERVER_ERROR;
-            message = "Internal Server Error: An unexpected error occurred.";
+            message = "Write Timeout: Failed to write response in time.";
+        }
+        // 连接异常
+        else if (cause instanceof java.io.IOException) {
+            status = HttpResponseStatus.BAD_REQUEST;
+            message = "Bad Request: Connection error - " + cause.getMessage();
+        }
+        // 其他框架异常
+        else {
+            status = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+            message = "Internal Server Error: An unexpected pipeline error occurred.";
         }
 
         if (ctx.channel().isActive()) {

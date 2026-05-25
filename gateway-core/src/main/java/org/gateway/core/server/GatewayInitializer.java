@@ -1,12 +1,12 @@
 package org.gateway.core.server;
 
-import org.gateway.core.Bean.BeanContainer;
+import org.gateway.common.config.GatewayConfig;
+import org.gateway.core.bean.BeanContainer;
 import org.gateway.core.codec.GatewayRequestCoder;
 import org.gateway.core.codec.GatewayResponseWriter;
-import org.gateway.core.config.GatewayConfig;
-import org.gateway.core.config.TrustedProxyResolver;
 import org.gateway.core.handler.ExceptionCatchHandler;
 import org.gateway.core.handler.NettyHttpServerHandler;
+import org.gateway.core.proxy.TrustedProxyResolver;
 
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;

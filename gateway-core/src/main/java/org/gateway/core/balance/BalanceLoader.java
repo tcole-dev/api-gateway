@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.gateway.common.enums.LoadBalanceStrategy;
 import org.gateway.common.model.ServiceInstance;
-import org.gateway.core.Bean.Component;
+import org.gateway.core.bean.Component;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BalanceLoader implements Component{

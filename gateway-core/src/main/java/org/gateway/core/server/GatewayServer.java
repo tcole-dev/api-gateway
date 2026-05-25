@@ -1,9 +1,9 @@
 package org.gateway.core.server;
 
 
-import org.gateway.core.Bean.BeanContainer;
-import org.gateway.core.Bean.HttpClient;
-import org.gateway.core.config.GatewayConfig;
+import org.gateway.common.config.GatewayConfig;
+import org.gateway.core.bean.BeanContainer;
+import org.gateway.core.client.HttpClient;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;

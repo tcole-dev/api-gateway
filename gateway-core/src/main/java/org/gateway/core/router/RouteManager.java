@@ -7,13 +7,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.gateway.common.config.GatewayConfig;
 import org.gateway.common.model.RouteDefinition;
 import org.gateway.common.utils.YamlUtil;
-import org.gateway.core.Bean.BeanContainer;
-import org.gateway.core.Bean.Component;
+import org.gateway.core.bean.BeanContainer;
+import org.gateway.core.bean.Component;
 import org.gateway.core.balance.BalanceLoader;
-import org.gateway.core.config.GatewayConfig;
-import org.gateway.core.config.RedissonComponent;
+import org.gateway.core.client.RedissonComponent;
 import org.redisson.api.RMap;
 import org.redisson.api.RTopic;
 import org.redisson.api.RedissonClient;

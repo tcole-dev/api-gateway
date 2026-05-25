@@ -1,4 +1,4 @@
-package org.gateway.core.Bean;
+package org.gateway.core.bean;
 
 public interface Component {
 

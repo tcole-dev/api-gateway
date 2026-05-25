@@ -1,4 +1,4 @@
-package org.gateway.core.Bean;
+package org.gateway.core.client;
 
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -12,6 +12,8 @@ import org.asynchttpclient.ListenableFuture;
 import org.asynchttpclient.Response;
 import org.gateway.common.model.GatewayRequest;
 import org.gateway.common.model.GatewayResponse;
+import org.gateway.core.bean.BeanContainer;
+import org.gateway.core.bean.Component;
 
 import io.netty.channel.EventLoopGroup;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +39,7 @@ public class HttpClient implements Component {
         this.client = new DefaultAsyncHttpClient(config);
 
         BeanContainer.registerBean(this);
-        
+
         log.info("Http客户端初始化完成");
     }
 
@@ -68,7 +70,7 @@ public class HttpClient implements Component {
 
         // 获取响应。目前使用同步方式获取响应，后续改为异步获取。目前的阻塞情况为已知状态。
         Response response = future.get();
-        
+
         // 处理响应
         GatewayResponse gatewayResponse = GatewayResponse.builder()
                 .requestId(request.getRequestId())
@@ -80,7 +82,7 @@ public class HttpClient implements Component {
                                 (v1, v2) -> v2))) // 处理重复键，保留最后一个
                 .body(response.getResponseBodyAsBytes())
                 .build();
-        
+
         return gatewayResponse; // 返回处理后的响应
     }
 
