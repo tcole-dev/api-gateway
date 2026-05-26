@@ -3,6 +3,7 @@ package org.gateway.core.filter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.gateway.common.model.GatewayRequest;
 import org.gateway.common.model.GatewayResponse;
@@ -43,27 +44,19 @@ public class FilterChain implements Component {
      * 执行过滤器链
      *
      * @param request 请求
-     * @return 响应
+     * @return 异步响应
      */
-    public GatewayResponse execute(GatewayRequest request) {
-        GatewayResponse response = null;
-        try {
-            // 1. 前置过滤器
-            response = executePreFilters(request);
-            if (response != null) {
-                return response;
-            }
-
-            // 2. 代理转发（路由匹配 + 负载均衡 + 转发）
-            response = proxyService.execute(request);
-
-            // 3. 后置过滤器
-            response = executePostFilters(request, response);
-        } catch (Exception e) {
-            // 4. 异常过滤器
-            response = executeErrorFilters(request, e);
+    public CompletableFuture<GatewayResponse> execute(GatewayRequest request) {
+        // 1. 前置过滤器（同步快速路径：限流、鉴权等无IO操作）
+        GatewayResponse preResult = executePreFilters(request);
+        if (preResult != null) {
+            return CompletableFuture.completedFuture(preResult);
         }
-        return response;
+
+        // 2. 代理转发 → 后置过滤器 → 异常过滤器（异步编排）
+        return proxyService.execute(request)
+                .thenApply(response -> executePostFilters(request, response))
+                .exceptionally(ex -> executeErrorFilters(request, ex));
     }
 
     /**

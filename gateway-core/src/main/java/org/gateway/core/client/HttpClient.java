@@ -1,7 +1,7 @@
 package org.gateway.core.client;
 
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletableFuture;
 
 import org.asynchttpclient.AsyncHttpClient;
 import org.asynchttpclient.AsyncHttpClientConfig;
@@ -44,7 +44,7 @@ public class HttpClient implements Component {
     }
 
 
-    public GatewayResponse forwardRequest(GatewayRequest request, String toUrl) throws InterruptedException, ExecutionException {
+    public CompletableFuture<GatewayResponse> forwardRequest(GatewayRequest request, String toUrl) {
         BoundRequestBuilder builder = client.prepare(request.getMethod().name(), toUrl);
 
         // Header
@@ -62,28 +62,33 @@ public class HttpClient implements Component {
         // Body
         if (request.getBody() != null
                 && request.getBody().length > 0) {
-
             builder.setBody(request.getBody());
         }
 
+        CompletableFuture<GatewayResponse> cf = new CompletableFuture<>();
         ListenableFuture<Response> future = builder.execute();
 
-        // 获取响应。目前使用同步方式获取响应，后续改为异步获取。目前的阻塞情况为已知状态。
-        Response response = future.get();
+        // 异步回调：在当前EventLoop线程执行，无线程切换
+        future.addListener(() -> {
+            try {
+                Response response = future.get();
+                GatewayResponse gatewayResponse = GatewayResponse.builder()
+                        .requestId(request.getRequestId())
+                        .status(response.getStatusCode())
+                        .headers(response.getHeaders().entries().stream()
+                                .collect(java.util.stream.Collectors.toMap(
+                                        Map.Entry::getKey,
+                                        Map.Entry::getValue,
+                                        (v1, v2) -> v2)))
+                        .body(response.getResponseBodyAsBytes())
+                        .build();
+                cf.complete(gatewayResponse);
+            } catch (Exception e) {
+                cf.completeExceptionally(e);
+            }
+        }, Runnable::run);
 
-        // 处理响应
-        GatewayResponse gatewayResponse = GatewayResponse.builder()
-                .requestId(request.getRequestId())
-                .status(response.getStatusCode())
-                .headers(response.getHeaders().entries().stream()
-                        .collect(java.util.stream.Collectors.toMap(
-                                Map.Entry::getKey,
-                                Map.Entry::getValue,
-                                (v1, v2) -> v2))) // 处理重复键，保留最后一个
-                .body(response.getResponseBodyAsBytes())
-                .build();
-
-        return gatewayResponse; // 返回处理后的响应
+        return cf;
     }
 
 

@@ -4,6 +4,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletableFuture;
 
 import org.gateway.common.model.GatewayRequest;
 import org.gateway.common.model.GatewayResponse;
@@ -39,20 +40,21 @@ public class ProxyService implements Component {
      * 路由匹配 → 负载均衡 → 记录上下文 → 转发请求
      *
      * @param request 请求
-     * @return 后端响应
-     * @throws RuntimeException 路由匹配失败、无可用实例、转发异常
+     * @return 异步后端响应
      */
-    public GatewayResponse execute(GatewayRequest request) {
+    public CompletableFuture<GatewayResponse> execute(GatewayRequest request) {
         // 1. 路由匹配
         RouteDefinition route = routeManager.matchRoute(request.getPath());
         if (route == null) {
-            throw new RuntimeException("No route found for path: " + request.getPath());
+            return CompletableFuture.failedFuture(
+                    new RuntimeException("No route found for path: " + request.getPath()));
         }
 
         // 2. 负载均衡选择实例
         ServiceInstance instance = balanceLoader.select(route.getServiceInstances());
         if (instance == null) {
-            throw new RuntimeException("No available service instance for route: " + route.getRouteId());
+            return CompletableFuture.failedFuture(
+                    new RuntimeException("No available service instance for route: " + route.getRouteId()));
         }
 
         // 3. 记录路由信息到请求上下文（供日志过滤器使用）
@@ -68,13 +70,8 @@ public class ProxyService implements Component {
 
         // 5. 构建目标 URL 并转发
         String toUrl = buildTargetUrl(instance, request);
-        log.info("转发请求到：{}", toUrl);
 
-        try {
-            return httpClient.forwardRequest(request, toUrl);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to forward request: " + e.getMessage(), e);
-        }
+        return httpClient.forwardRequest(request, toUrl);
     }
 
     /**

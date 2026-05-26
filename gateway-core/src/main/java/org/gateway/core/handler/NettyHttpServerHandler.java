@@ -6,7 +6,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import lombok.extern.slf4j.Slf4j;
 
 import org.gateway.common.model.GatewayRequest;
-import org.gateway.common.model.GatewayResponse;
 import org.gateway.core.bean.BeanContainer;
 import org.gateway.core.codec.GatewayResponseWriter;
 import org.gateway.core.filter.FilterChain;
@@ -27,15 +26,19 @@ public class NettyHttpServerHandler extends SimpleChannelInboundHandler<GatewayR
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, GatewayRequest msg) throws Exception {
-        GatewayResponse response = filterChain.execute(msg);
-
-        // 确保响应不为 null
-        if (response == null) {
-            response = GatewayResponseWriter.errorResponse(
-                    HttpResponseStatus.INTERNAL_SERVER_ERROR,
-                    "Internal Server Error: No response generated");
-        }
-
-        ctx.channel().writeAndFlush(response);
+        filterChain.execute(msg).whenComplete((response, ex) -> {
+            if (ex != null) {
+                log.error("请求处理异常: {}", ex.getMessage(), ex);
+                response = GatewayResponseWriter.errorResponse(
+                        HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                        "Internal Server Error: " + ex.getMessage());
+            }
+            if (response == null) {
+                response = GatewayResponseWriter.errorResponse(
+                        HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                        "Internal Server Error: No response generated");
+            }
+            ctx.channel().writeAndFlush(response);
+        });
     }
 }
