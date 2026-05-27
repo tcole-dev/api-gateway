@@ -7,11 +7,14 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import org.gateway.common.exception.GatewayBusinessException;
+import org.gateway.common.exception.RouteNotFoundException;
 import org.gateway.common.model.GatewayRequest;
 import org.gateway.common.model.GatewayResponse;
+import org.gateway.common.model.RouteDefinition;
 import org.gateway.core.bean.Component;
 import org.gateway.core.filter.impl.LogFilter;
 import org.gateway.core.proxy.ProxyService;
+import org.gateway.core.router.RouteManager;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,10 +37,14 @@ public class FilterChain implements Component {
     /** 日志过滤器（构造时自动创建，最先/最后执行） */
     private final LogFilter logFilter;
 
+    /** 路由管理器 */
+    private final RouteManager routeManager;
+
     /** 代理转发服务 */
     private final ProxyService proxyService;
 
-    public FilterChain(ProxyService proxyService) {
+    public FilterChain(RouteManager routeManager, ProxyService proxyService) {
+        this.routeManager = routeManager;
         this.proxyService = proxyService;
         this.logFilter = new LogFilter();
     }
@@ -50,7 +57,16 @@ public class FilterChain implements Component {
      */
     public CompletableFuture<GatewayResponse> execute(GatewayRequest request) {
         try {
-            // 1. 前置过滤器（同步快速路径：限流、鉴权等无IO操作）
+            // 1. 路由匹配（提前到过滤器之前，供限流等过滤器使用）
+            RouteDefinition route = routeManager.matchRoute(request.getPath());
+            if (route == null) {
+                return CompletableFuture.failedFuture(new RouteNotFoundException(request.getPath()));
+            }
+            request.setAttribute("route", route);
+            request.setAttribute("routeId", route.getRouteId());
+            request.setAttribute("limit", route.getLimit());
+
+            // 2. 前置过滤器（同步快速路径：限流、鉴权等无IO操作）
             GatewayResponse preResult = executePreFilters(request);
             if (preResult != null) {
                 return CompletableFuture.completedFuture(preResult);
@@ -60,7 +76,7 @@ public class FilterChain implements Component {
             return CompletableFuture.failedFuture(e);
         }
 
-        // 2. 代理转发 → 后置过滤器 → 异常过滤器（异步编排）
+        // 3. 代理转发 → 后置过滤器 → 异常过滤器（异步编排）
         return proxyService.execute(request)
                 .thenApply(response -> executePostFilters(request, response))
                 .exceptionally(ex -> executeErrorFilters(request, ex));

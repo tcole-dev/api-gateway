@@ -40,14 +40,14 @@ public class ProxyService implements Component {
 
     /**
      * 执行代理转发（完整流程）
-     * 路由匹配 → 负载均衡 → 记录上下文 → 转发请求
+     * 从请求上下文获取路由信息 → 负载均衡 → 记录上下文 → 转发请求
      *
-     * @param request 请求
+     * @param request 请求（已包含路由信息）
      * @return 异步后端响应
      */
     public CompletableFuture<GatewayResponse> execute(GatewayRequest request) {
-        // 1. 路由匹配
-        RouteDefinition route = routeManager.matchRoute(request.getPath());
+        // 1. 从请求上下文获取路由信息（FilterChain已提前匹配）
+        RouteDefinition route = request.getAttribute("route");
         if (route == null) {
             return CompletableFuture.failedFuture(new RouteNotFoundException(request.getPath()));
         }
@@ -58,8 +58,7 @@ public class ProxyService implements Component {
             return CompletableFuture.failedFuture(new ServiceUnavailableException(route.getRouteId()));
         }
 
-        // 3. 记录路由信息到请求上下文（供日志过滤器使用）
-        request.setAttribute("routeId", route.getRouteId());
+        // 3. 记录实例信息到请求上下文（供日志过滤器使用）
         request.setAttribute("instance", instance.getHost() + ":" + instance.getPort());
         String forward = instance.getScheme() + "://" + instance.getHost() + ":" + instance.getPort() + request.getPath();
         request.setAttribute("forward", forward);

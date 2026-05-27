@@ -7,6 +7,7 @@ import org.gateway.core.balance.BalanceLoader;
 import org.gateway.core.client.RedissonComponent;
 import org.gateway.core.filter.FilterChain;
 import org.gateway.core.filter.impl.ErrorFilter;
+import org.gateway.core.filter.impl.RateLimitFilter;
 import org.gateway.core.proxy.ProxyService;
 import org.gateway.core.proxy.TrustedProxyResolver;
 import org.gateway.core.router.RouteManager;
@@ -85,9 +86,10 @@ public class BeanContainer {
         ProxyService proxyService = new ProxyService();
         beanMap.put(ProxyService.class, proxyService);
 
-        // 7. 注册 FilterChain + ErrorFilter
-        FilterChain filterChain = new FilterChain(proxyService);
+        // 7. 注册 FilterChain + ErrorFilter + RateLimitFilter
+        FilterChain filterChain = new FilterChain(routeManager, proxyService);
         filterChain.addFilter(new ErrorFilter());
+        filterChain.addFilter(new RateLimitFilter());
         beanMap.put(FilterChain.class, filterChain);
     }
 
