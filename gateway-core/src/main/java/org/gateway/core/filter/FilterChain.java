@@ -1,10 +1,12 @@
 package org.gateway.core.filter;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import org.gateway.common.exception.GatewayBusinessException;
 import org.gateway.common.model.GatewayRequest;
 import org.gateway.common.model.GatewayResponse;
 import org.gateway.core.bean.Component;
@@ -47,10 +49,15 @@ public class FilterChain implements Component {
      * @return 异步响应
      */
     public CompletableFuture<GatewayResponse> execute(GatewayRequest request) {
-        // 1. 前置过滤器（同步快速路径：限流、鉴权等无IO操作）
-        GatewayResponse preResult = executePreFilters(request);
-        if (preResult != null) {
-            return CompletableFuture.completedFuture(preResult);
+        try {
+            // 1. 前置过滤器（同步快速路径：限流、鉴权等无IO操作）
+            GatewayResponse preResult = executePreFilters(request);
+            if (preResult != null) {
+                return CompletableFuture.completedFuture(preResult);
+            }
+        } catch (Exception e) {
+            // pre-filter 异常也统一走 ErrorFilter 路径
+            return CompletableFuture.failedFuture(e);
         }
 
         // 2. 代理转发 → 后置过滤器 → 异常过滤器（异步编排）
@@ -137,9 +144,11 @@ public class FilterChain implements Component {
     private GatewayResponse executeErrorFilters(GatewayRequest request, Throwable ex) {
         logFilter.printPartialLog(request, null, "error");
 
+        Throwable cause = (ex.getCause() != null) ? ex.getCause() : ex;
+
         for (AbstractGatewayFilter filter : errorFilters) {
             try {
-                GatewayResponse resp = filter.errorFilter(request, ex);
+                GatewayResponse resp = filter.errorFilter(request, cause);
                 if (resp != null) {
                     return resp;
                 }
@@ -147,6 +156,18 @@ public class FilterChain implements Component {
                 log.error("异常过滤器 {} 执行异常: {}", filter.getId(), e.getMessage(), e);
             }
         }
-        return null;
+
+        // 兜底：ErrorFilter 未注册或未返回响应时，构造基本错误响应
+        int status = (cause instanceof GatewayBusinessException gex)
+                ? gex.getStatusCode() : 500;
+        String message = cause.getMessage() != null ? cause.getMessage() : "Internal Server Error";
+        String json = String.format("{\"requestId\":\"%s\",\"status\":%d,\"message\":\"%s\"}",
+                request.getRequestId(), status, message);
+
+        return GatewayResponse.builder()
+                .requestId(request.getRequestId())
+                .status(status)
+                .body(json.getBytes(StandardCharsets.UTF_8))
+                .build();
     }
 }

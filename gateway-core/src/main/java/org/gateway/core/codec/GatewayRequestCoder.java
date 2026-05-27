@@ -70,6 +70,14 @@ public class GatewayRequestCoder extends SimpleChannelInboundHandler<FullHttpReq
         String realIp = proxyResolver.resolve(tcpRemote, xff);
         request.setRemoteAddress(realIp);
 
+        // 保存 TCP 源地址（用于 X-Forwarded-For 追加）
+        String cleanTcpRemote = tcpRemote.startsWith("/") ? tcpRemote.substring(1) : tcpRemote;
+        int colonIdx = cleanTcpRemote.lastIndexOf(':');
+        if (colonIdx > 0) {
+            cleanTcpRemote = cleanTcpRemote.substring(0, colonIdx);
+        }
+        request.setAttribute("tcpRemoteAddress", cleanTcpRemote);
+
         // 请求时间戳
         request.setTimestamp(System.currentTimeMillis());
         // 请求ID

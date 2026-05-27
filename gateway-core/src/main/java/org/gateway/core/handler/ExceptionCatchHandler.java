@@ -1,7 +1,6 @@
 package org.gateway.core.handler;
 
 
-import org.gateway.common.exception.GatewayBusinessException;
 import org.gateway.common.model.GatewayResponse;
 import org.gateway.core.codec.GatewayResponseWriter;
 
@@ -13,20 +12,13 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Pipeline 框架级异常处理器
  * 只处理 Netty 框架层面的异常（编解码、超时、连接等）
- * 业务异常（GatewayBusinessException）由 FilterChain 中的 ErrorFilter 处理
+ * 业务异常统一由 FilterChain 中的 ErrorFilter 处理，不会到达这里
  */
 @Slf4j
 public class ExceptionCatchHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        // 业务异常交给 ErrorFilter 处理，不在这里处理
-        if (cause instanceof GatewayBusinessException) {
-            super.exceptionCaught(ctx, cause);
-            return;
-        }
-
-        // 只处理 Pipeline 框架异常
         log.error("Pipeline 框架异常: {}", cause.getMessage(), cause);
 
         HttpResponseStatus status;
@@ -63,10 +55,15 @@ public class ExceptionCatchHandler extends ChannelInboundHandlerAdapter {
             message = "Internal Server Error: An unexpected pipeline error occurred.";
         }
 
+        sendError(ctx, status, message);
+    }
+
+    /**
+     * 发送错误响应并关闭连接
+     */
+    private void sendError(ChannelHandlerContext ctx, HttpResponseStatus status, String message) {
         if (ctx.channel().isActive()) {
-            // 使用 GatewayResponseWriter 的静态方法构建响应
             GatewayResponse errorResp = GatewayResponseWriter.errorResponse(status, message);
-            // 使用 channel().writeAndFlush 确保经过 GatewayResponseWriter 出站处理器
             ctx.channel().writeAndFlush(errorResp).addListener(future -> {
                 if (!future.isSuccess()) {
                     log.error("Failed to send error response", future.cause());

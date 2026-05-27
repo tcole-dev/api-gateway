@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.CompletableFuture;
 
+import org.gateway.common.exception.GatewayBusinessException;
+import org.gateway.common.exception.RouteNotFoundException;
+import org.gateway.common.exception.ServiceUnavailableException;
 import org.gateway.common.model.GatewayRequest;
 import org.gateway.common.model.GatewayResponse;
 import org.gateway.common.model.RouteDefinition;
@@ -46,15 +49,13 @@ public class ProxyService implements Component {
         // 1. 路由匹配
         RouteDefinition route = routeManager.matchRoute(request.getPath());
         if (route == null) {
-            return CompletableFuture.failedFuture(
-                    new RuntimeException("No route found for path: " + request.getPath()));
+            return CompletableFuture.failedFuture(new RouteNotFoundException(request.getPath()));
         }
 
         // 2. 负载均衡选择实例
         ServiceInstance instance = balanceLoader.select(route.getServiceInstances());
         if (instance == null) {
-            return CompletableFuture.failedFuture(
-                    new RuntimeException("No available service instance for route: " + route.getRouteId()));
+            return CompletableFuture.failedFuture(new ServiceUnavailableException(route.getRouteId()));
         }
 
         // 3. 记录路由信息到请求上下文（供日志过滤器使用）
@@ -65,13 +66,25 @@ public class ProxyService implements Component {
 
         // 4. 添加代理头
         String realClientIp = request.getRemoteAddress();
-        request.getHeaders().put("X-Forwarded-For", realClientIp);
+        // X-Forwarded-For：追加 TCP 源地址，保留代理链
+        String tcpRemote = request.getAttribute("tcpRemoteAddress");
+        String xff = request.getHeaders().get("X-Forwarded-For");
+        String newXff = (xff != null) ? xff + ", " + tcpRemote : tcpRemote;
+        request.getHeaders().put("X-Forwarded-For", newXff);
+        // X-Real-Ip：TrustedProxyResolver 解析后的真实客户端 IP
         request.getHeaders().put("X-Real-Ip", realClientIp);
 
         // 5. 构建目标 URL 并转发
         String toUrl = buildTargetUrl(instance, request);
 
-        return httpClient.forwardRequest(request, toUrl);
+        return httpClient.forwardRequest(request, toUrl)
+                .exceptionally(ex -> {
+                    if (ex.getCause() instanceof GatewayBusinessException) {
+                        throw (GatewayBusinessException) ex.getCause();
+                    }
+                    throw new GatewayBusinessException(502,
+                            "Bad Gateway: " + ex.getMessage(), ex);
+                });
     }
 
     /**
